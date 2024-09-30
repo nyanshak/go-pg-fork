@@ -231,28 +231,25 @@ func readAuthOK(rd *internal.BufReader) error {
 }
 
 func (db *baseDB) authSASL(cn *pool.Conn, rd *internal.BufReader, user, password string) error {
-	s, err := readString(rd)
-	if err != nil {
-		return err
-	}
+	var saslMech sasl.Mechanism
 
-    var saslMech sasl.Mechanism
+loop:
+	for {
+		s, err := readString(rd)
+		if err != nil {
+			return err
+		}
 
-	switch s {
-	case sasl.ScramSha256.Name:
-		saslMech = sasl.ScramSha256
-	case sasl.ScramSha256Plus.Name:
-		saslMech = sasl.ScramSha256Plus
-	default:
-		return fmt.Errorf("got %q, wanted %q", s, sasl.ScramSha256.Name)
-	}
-
-	c0, err := rd.ReadByte()
-	if err != nil {
-		return err
-	}
-	if c0 != 0 {
-		return fmt.Errorf("pg: SASL: got %q, wanted %q", c0, 0)
+		switch s {
+		case "":
+			break loop
+		case sasl.ScramSha256.Name:
+			saslMech = sasl.ScramSha256
+		case sasl.ScramSha256Plus.Name:
+			// ignore
+		default:
+			return fmt.Errorf("got %q, wanted %q", s, sasl.ScramSha256.Name)
+		}
 	}
 
 	creds := sasl.Credentials(func() (Username, Password, Identity []byte) {
